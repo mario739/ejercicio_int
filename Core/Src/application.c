@@ -38,6 +38,7 @@
 
 /********************** inclusions *******************************************/
 #include "application.h"
+#include "messages_transfer.h"
 
 /********************** macros and definitions *******************************/
 #define BUTTON_TIME_MAX_VALUE_          (9999)
@@ -50,56 +51,44 @@
 static QueueHandle_t queue_1;
 static char const *const g_str_led_on_ = "LED ON";
 static char const *const g_str_button_format_ = "TEC%d T%d";
+static msgbuffer_t g_msgbuffer_a1;
 /********************** external data definition *****************************/
 
 /********************** internal functions definition ************************/
 
 /********************** external functions definition ************************/
 
-static char* generate_message_task_a(bool enable)
+static void led_routine(bool enable)
 {
   if (false == enable)
   {
-    return NULL;
+    return;
   }
   printf_data("[a] Led ON\r\n");
   size_t str_msg_len = strlen(g_str_led_on_);
-  char *p_mem_str = (char*)pvPortMalloc(str_msg_len + 1);
-  return p_mem_str;
-}
 
-static char* send_message_taks_a(char *p_mem_str)
-{
-  if (NULL == p_mem_str)
+  void *p_message = msgbuffer_sender_message_create(&g_msgbuffer_a1, str_msg_len + 1);
   {
-    return NULL;
+    if (NULL != p_message)
+    {
+      strncpy((char*)p_message, g_str_led_on_, str_msg_len + 1);
+    }
   }
-  char data_print[30];
-  size_t str_msg_len = strlen(g_str_led_on_);
-  strncpy(p_mem_str, g_str_led_on_, str_msg_len + 1);
+  msgbuffer_sender_post(&g_msgbuffer_a1, p_message, 0);
 
-  portBASE_TYPE status;
-  status = xQueueSendToBack(queue_1, (void* )&p_mem_str, 0);
-  if (pdPASS == status)
-  {
-    sprintf(data_print, "[a] Send: %s\r\n", p_mem_str);
-    printf_data(data_print);
-  }
 }
-
 static void task_sender_a(void *p_parameter)
 {
   led_init(LD1_GPIO_Port, LD1_Pin);
   while (true)
   {
     led_toggle(LD1_GPIO_Port, LD1_Pin);
-    char *p_mem_str = generate_message_task_a(led_read_state(LD1_GPIO_Port, LD1_Pin));
-    send_message_taks_a(p_mem_str);
+    led_routine(led_read_state(LD1_GPIO_Port, LD1_Pin));
     vTaskDelay(1000 / portTICK_RATE_MS);
   }
 }
 
-static void* generate_message_task_b(uint8_t button_id)
+static size_t generate_message_task_b(uint8_t button_id)
 {
   char data_print[50];
   char str_msg_buffer[BUTTON_MSG_MAX_LEN_ + 1];
@@ -114,37 +103,23 @@ static void* generate_message_task_b(uint8_t button_id)
     time = BUTTON_TIME_MAX_VALUE_;
   }
   snprintf(str_msg_buffer, BUTTON_MSG_MAX_LEN_ + 1, g_str_button_format_, button_id, time);
-  size_t str_msg_len = strlen(str_msg_buffer);
-  char *p_mem_str = (char*)pvPortMalloc(str_msg_len + 1);
-
-  if (NULL != p_mem_str)
-  {
-    strncpy(p_mem_str, str_msg_buffer, str_msg_len + 1);
-  }
-
-  return p_mem_str;
-}
-
-static void* send_message_taks_b(char *p_mem_str)
-{
-  if (NULL == p_mem_str)
-  {
-    return NULL;
-  }
-  char data_print[50];
-  portBASE_TYPE status;
-  status = xQueueSendToBack(queue_1, (void* )&p_mem_str, 0);
-  if (pdPASS == status)
-  {
-    sprintf(data_print, "[b] Send: %s\r\n", p_mem_str);
-    printf_data(data_print);
-  }
+  return strlen(str_msg_buffer);
 }
 
 static void rutine_buttons(uint8_t button_id)
 {
-  char* p_mem_str = generate_message_task_b(button_id);
-  send_message_taks_b(p_mem_str);
+  char str_msg_buffer[BUTTON_MSG_MAX_LEN_ + 1];
+  size_t str_msg_len = generate_message_task_b(button_id);
+
+  void *p_message = msgbuffer_sender_message_create(&g_msgbuffer_a1, str_msg_len + 1);
+  {
+    if (NULL != p_message)
+    {
+      strncpy((char*)p_message, str_msg_buffer, str_msg_len + 1);
+    }
+  }
+  msgbuffer_sender_post(&g_msgbuffer_a1, p_message, 0);
+
 }
 
 static void task_sender_b(void *p_parameter)
@@ -177,7 +152,8 @@ static void tarea_receiver_c(void *p_parameter)
 {
   while (true)
   {
-    message_receive_task_c();
+    void *p_message = msgbuffer_receiver_get(&g_msgbuffer_a1, portMAX_DELAY);
+    msgbuffer_receiver_message_destroid(&g_msgbuffer_a1, p_message);
   }
 }
 int application(void)
@@ -192,8 +168,7 @@ int application(void)
   res = xTaskCreate(tarea_receiver_c, (const char*)"tarea_receiver_c", configMINIMAL_STACK_SIZE * 2, NULL,tskIDLE_PRIORITY + 1, NULL);
   configASSERT(res == pdPASS);
 
-  queue_1 = xQueueCreate(5, sizeof(char*));
-  configASSERT(queue_1!= NULL);
+  msgbuffer_init(&g_msgbuffer_a1, 5);
   osKernelStart();
 
   while (1)
