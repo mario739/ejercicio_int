@@ -48,7 +48,6 @@
 /********************** internal functions declaration ***********************/
 
 /********************** internal data definition *****************************/
-static QueueHandle_t queue_1;
 static char const *const g_str_led_on_ = "LED ON";
 static char const *const g_str_button_format_ = "TEC%d T%d";
 static msgbuffer_t g_msgbuffer_a1;
@@ -133,26 +132,17 @@ static void task_sender_b(void *p_parameter)
   }
 }
 
-static void message_receive_task_c(void)
-{
-  portBASE_TYPE status;
-  char const *p_mem_str = NULL;
-  char data_print[30];
-
-  status = xQueueReceive(queue_1, (void*)&p_mem_str, portMAX_DELAY);
-  if (pdPASS == status)
-  {
-    sprintf(data_print, "[c] Receive: %s\r\n", p_mem_str);
-    printf_data(data_print);
-    vPortFree((void*)p_mem_str);
-    p_mem_str = NULL;
-  }
-}
 static void tarea_receiver_c(void *p_parameter)
 {
+  char data_print[30];
   while (true)
   {
     void *p_message = msgbuffer_receiver_get(&g_msgbuffer_a1, portMAX_DELAY);
+    if (p_message!=NULL)
+    {
+      sprintf(data_print,"[c] msg: %s\r\n",p_message);
+      printf_data(data_print);
+    }
     msgbuffer_receiver_message_destroid(&g_msgbuffer_a1, p_message);
   }
 }
