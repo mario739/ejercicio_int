@@ -51,6 +51,7 @@
 static char const *const g_str_led_on_ = "LED ON";
 static char const *const g_str_button_format_ = "TEC%d T%d";
 static msgbuffer_t g_msgbuffer_a1;
+static msgbuffer_t g_msgbuffer_a2;
 /********************** external data definition *****************************/
 
 /********************** internal functions definition ************************/
@@ -138,12 +139,28 @@ static void tarea_receiver_c(void *p_parameter)
   while (true)
   {
     void *p_message = msgbuffer_receiver_get(&g_msgbuffer_a1, portMAX_DELAY);
-    if (p_message!=NULL)
+    if (p_message != NULL)
     {
-      sprintf(data_print,"[c] msg: %s\r\n",p_message);
+      msgbuffer_sender_post(&g_msgbuffer_a2, p_message, 0);
+      sprintf(data_print, "[c] msg: %s\r\n", p_message);
       printf_data(data_print);
     }
     msgbuffer_receiver_message_destroid(&g_msgbuffer_a1, p_message);
+  }
+}
+
+
+static void tarea_receiver_d(void *p_parameter)
+{
+  char data_print[30];
+  while (true)
+  {
+    void *p_message = msgbuffer_receiver_get(&g_msgbuffer_a2, portMAX_DELAY);
+    if (p_message != NULL)
+    {
+      sprintf(data_print, "[d] msg: %s\r\n", p_message);
+      printf_data(data_print);
+    }
   }
 }
 int application(void)
@@ -158,7 +175,11 @@ int application(void)
   res = xTaskCreate(tarea_receiver_c, (const char*)"tarea_receiver_c", configMINIMAL_STACK_SIZE * 2, NULL,tskIDLE_PRIORITY + 1, NULL);
   configASSERT(res == pdPASS);
 
+  res = xTaskCreate(tarea_receiver_d, (const char*)"tarea_receiver_d", configMINIMAL_STACK_SIZE * 2, NULL,tskIDLE_PRIORITY + 1, NULL);
+  configASSERT(res == pdPASS);
+
   msgbuffer_init(&g_msgbuffer_a1, 5);
+  msgbuffer_init(&g_msgbuffer_a2, 5);
   osKernelStart();
 
   while (1)
