@@ -58,14 +58,14 @@ static char const *const g_str_button_format_ = "TEC%d T%d";
 
 static void task_sender_a(void *p_parameter)
 {
+  char data_print[30];
   led_init(LD1_GPIO_Port, LD1_Pin);
   while (true)
   {
     led_toggle(LD1_GPIO_Port, LD1_Pin);
     if (true == led_read_state(LD1_GPIO_Port, LD1_Pin))
     {
-      // EX_DEBUG_CONSOLE("[a] Led ON\r\n");
-
+      printf_data("[a] Led ON\r\n");
       size_t str_msg_len = strlen(g_str_led_on_);
       char *str_msg = (char*)pvPortMalloc(str_msg_len + 1);
       if (NULL != str_msg)
@@ -75,7 +75,8 @@ static void task_sender_a(void *p_parameter)
         status = xQueueSend(queue_1, (void* )&str_msg, 0);
         if (pdPASS == status)
         {
-          //EX_DEBUG_CONSOLE("[a] Send: %s\r\n", str_msg);
+          sprintf(data_print,"[a] Send: %s\r\n",str_msg);
+          printf_data(data_print);
         }
       }
     }
@@ -84,16 +85,18 @@ static void task_sender_a(void *p_parameter)
 }
 static void task_sender_b(void *p_parameter)
 {
+  char data_print[50];
   char str_msg_buffer[BUTTON_MSG_MAX_LEN_ + 1];
-
   buttons_init();
-
   while (true)
   {
     for (unsigned int button_id = 0; button_id < 2; ++button_id)
     {
       uint32_t time = button_press_time(button_id);
-      //EX_DEBUG_CONSOLE("[b] Button:%u, Time:%u\r\n", button_id, time);
+      sprintf(data_print,"[b] Button:%u, Time:%lu\r\n",button_id, time);
+      printf_data(data_print);
+      memset(data_print,0,sizeof(data_print));
+
       if (BUTTON_TIME_MAX_VALUE_ < time)
       {
         time = BUTTON_TIME_MAX_VALUE_;
@@ -109,7 +112,8 @@ static void task_sender_b(void *p_parameter)
         status = xQueueSendToBack(queue_1, (void* )&str_msg, 0);
         if (pdPASS == status)
         {
-          // EX_DEBUG_CONSOLE("[b] Send: %s\r\n", str_msg);
+          sprintf(data_print,"[b] Send: %s\r\n",str_msg);
+          printf_data(data_print);
         }
       }
     }
@@ -121,13 +125,14 @@ static void tarea_receiver_c(void *p_parameter)
 {
   portBASE_TYPE status;
   char const *str_msg = NULL;
-
+  char data_print[30];
   while (true)
   {
     status = xQueueReceive(queue_1, (void*)&str_msg, portMAX_DELAY);
     if (pdPASS == status)
     {
-      //EX_DEBUG_CONSOLE("[c] Receive: %s\r\n", str_msg);
+      sprintf(data_print,"[c] Receive: %s\r\n",str_msg);
+      printf_data(data_print);
       vPortFree((void*)str_msg);
       str_msg = NULL;
     }
@@ -136,16 +141,13 @@ static void tarea_receiver_c(void *p_parameter)
 int application(void)
 {
   BaseType_t res;
-  res = xTaskCreate(task_sender_a, (const char*)"task_sender_a", configMINIMAL_STACK_SIZE * 2, NULL,
-                    tskIDLE_PRIORITY + 1, NULL);
+  res = xTaskCreate(task_sender_a, (const char*)"task_sender_a", configMINIMAL_STACK_SIZE * 2, NULL,tskIDLE_PRIORITY + 1, NULL);
   configASSERT(res == pdPASS);
 
-  res = xTaskCreate(task_sender_b, (const char*)"task_sender_b", configMINIMAL_STACK_SIZE * 2, NULL,
-                    tskIDLE_PRIORITY + 1, NULL);
+  res = xTaskCreate(task_sender_b, (const char*)"task_sender_b", configMINIMAL_STACK_SIZE * 2, NULL,tskIDLE_PRIORITY + 1,NULL);
   configASSERT(res == pdPASS);
 
-  res = xTaskCreate(tarea_receiver_c, (const char*)"tarea_receiver_c", configMINIMAL_STACK_SIZE * 2, NULL,
-                    tskIDLE_PRIORITY + 1, NULL);
+  res = xTaskCreate(tarea_receiver_c, (const char*)"tarea_receiver_c", configMINIMAL_STACK_SIZE * 2, NULL,tskIDLE_PRIORITY + 1,NULL);
   configASSERT(res == pdPASS);
 
   queue_1 = xQueueCreate(5, sizeof(char*));

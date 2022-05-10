@@ -66,7 +66,9 @@ void MX_USART3_UART_Init(void)
 
 void printf_data(const char* data)
 {
+  taskENTER_CRITICAL();
   HAL_UART_Transmit(&huart3,(uint8_t*)data,(uint16_t) strlen((char *)data),100);
+  taskEXIT_CRITICAL();
 }
 
 /********************** end of file ******************************************/
